@@ -1,0 +1,115 @@
+---
+title: 'ChatGPT: Global Mortality'
+author: "David Jackson"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(plotly)
+library(scales)
+library(DBI)
+library(odbc)
+```
+
+## Read Excel directly from the URL
+
+
+```{r cars}
+rm(list=ls())
+mortality <- read_xlsx("./global_mortality.xlsx") %>%
+  janitor::clean_names()
+```
+```{r}
+## https://db.rstudio.com/databases/microsoft-sql-server/
+con <- DBI::dbConnect(odbc::odbc(), 
+                      Driver = "SQL Server", 
+                      Server = "localhost\\SQLEXPRESS", 
+                      Database = "tidytuesday", 
+                      Trusted_Connection = "True")
+
+dbWriteTable(con, "mortality",mortality ,overwrite=TRUE)
+dbListFields(con,"mortality")
+dbGetQuery(con,"select count(*),
+            min(year) as start_year,
+           max(year)  as end_year
+           from mortality")
+```
+```{r}
+mortality_long <- dbGetQuery(con,"select *
+           from mortality_long")
+```
+
+### Begin EDA using Plotly
+
+```{r}
+
+# Create a scatter plot of deaths vs. year for a specific cause and country
+df <- mortality_long %>%
+  filter(cause == "cardiovascular" & country == "United States")
+
+plot_ly(df, x = ~year, y = ~deaths, type = "scatter", mode = "markers",
+        marker = list(size = 10, color = "blue")) %>%
+  layout(title = "Deaths by Year",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of Deaths"))
+
+```
+
+```{r}
+library(plotly)
+
+# Create a box plot of deaths by cause for a specific country and year
+df <- mortality_long %>%
+  filter(country == "United States" & year ==2016)
+
+plot_ly(df, y = ~deaths, x = ~cause, type = "box",
+        boxpoints = "all", jitter = 0.3,
+        pointpos = -1.8, marker = list(size = 3, color = "blue")) %>%
+  layout(title = "Deaths by Cause in 2020",
+         xaxis = list(title = "Cause"),
+         yaxis = list(title = "Number of Deaths"))
+
+```
+```{r}
+
+# Create a stacked bar chart of deaths by year and cause for a specific country
+df <- mortality_long %>%
+  filter(country == "United States")
+
+plot_ly(df, x = ~year, y = ~deaths, color = ~cause, type = "bar") %>%
+  layout(title = "Deaths by Cause and Year",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of Deaths"),
+         barmode = "stack")
+
+```
+```{r}
+library(plotly)
+
+# Create a heat map of deaths by year and cause for a specific country
+df <- mortality_long %>%
+  filter(country == "United States")
+
+plot_ly(df, x = ~cause, y = ~year, z = ~deaths, type = "heatmap") %>%
+  layout(title = "Deaths by Cause and Year",
+         xaxis = list(title = "Cause"),
+         yaxis = list(title = "Year"))
+
+```
+```{r}
+
+# Create a line chart of deaths by year for a specific cause and country
+df <- mortality_long %>%
+  filter(country == "United States" & cause == "lower_respiratory")
+
+plot_ly(df, x = ~year, y = ~deaths, type = "scatter", mode = "lines") %>%
+  layout(title = "Deaths by Year for Specific Cause",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "Number of Deaths"))
+
+```
+
